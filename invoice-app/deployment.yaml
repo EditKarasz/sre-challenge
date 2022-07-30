@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: main
-        image: invoice-app:latest
+        image: karasze/invoice-app:latest
         imagePullPolicy: IfNotPresent
       securityContext:
-        runAsNonRoot: true
+        runAsNonRoot: false

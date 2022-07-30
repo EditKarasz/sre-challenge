@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: main
-        image: payment-provider:latest
+        image: karasze/payment-provider:latest
         imagePullPolicy: IfNotPresent
       securityContext:
-        runAsNonRoot: true
+        runAsNonRoot: false
