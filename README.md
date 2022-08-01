@@ -149,6 +149,14 @@ To check it works you should check the GET endpoint: ***http:/<EXTERNAL_IP>:8081
 **Note:** You can troubleshoot the application by [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) to your local host. 
 
 3. Update existing `deployment.yaml` files to follow k8s best practices. Feel free to remove existing files, recreate them, and/or introduce different technologies. Follow best practices for any other resources you decide to create.
+
+- This step is outside of the deployment.yaml but I wanted to add it here. I have not merged the two deployment files into one because of multiple reasons. I have added to each of them a separate namespace. It is in a separate file. (It is in a higher cluster level). I will use it for the deployment.sh script's first version.  I have created 2 namespaces for the 2 applications because these are independent services. It is easier to set up RBAC roles later on namespace level. It is easier to manage these services' lifecycle individually.
+- I have added labels. It will be good for grouping if we expand the services in the future.
+- I have created a service for each application for management reasons. invoice-app's service is a loadbalancer. This means a network layout is assinged to it. The payment-provider has a simple service for magement reason.
+- I have added resources to the containers / pods. In this excercise it is not important but when we plan how much resources we need to size the cluster which host multiple applications and/or environments it is useful. Resource requests and limits determines if an application can be deployed on the cluster and which node has enough resources available to host a new pod. The LimitRange works on namespace level but if we have gotten a complex service with multiple applications, and these applications have different resource needs I would specify directly the resources in the deployment. See commented lines in the deployment.yaml
+- This is not important but I have updated the rollout strategy. It is not important because we do not talk about releases in this exercise. It is a ramped (slow) rollout. The new release creates a new replica set. One new pod spins up at the time and one stops from the original replica set. Replaces one at the time.
+- This is not important because if we use kubectl for deployment it can run all the files located in a folder but I have moved every yaml file in one configuration as code file.
+
 4. Provide a better way to pass the URL in `invoice-app/main.go` - it's hardcoded at the moment
 5. Complete `deploy.sh` in order to automate all the steps needed to have both apps running in a K8s cluster.
 6. Complete `test.sh` so we can validate your solution can successfully pay all the unpaid invoices and return a list of all the paid invoices.
