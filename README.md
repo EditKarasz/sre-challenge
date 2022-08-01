@@ -54,7 +54,8 @@ I have used MiniKube on my local computer. It needs to connect to an external co
 ```$ minikube addons configure registry-creds```
 
 I have added my dockerhub account where I have pushed the built images. This meant I had to change the path to the image:
-```$ grep 'image:' sre-challenge/invoice-app/deployment.yaml
+```
+$ grep 'image:' sre-challenge/invoice-app/deployment.yaml
 ...
         image: karasze/payment-provider:latest
 ```
@@ -106,36 +107,47 @@ We would like these 2 apps, `invoice-app` and `payment-provider`, to run in a K8
 
 1. `invoice-app` must be reachable from outside the cluster.
 
-As a first implementation I have added an ingress controller.
-It creates the ingress controller and connects to a service created for the invoice-app deployment.  
-Deploying the service:
+I have used a loadballancer. I have deployed the 2 applications on Minikube. On Minikube to expose the service on a external IP address you have to use minikube tunnel. To create it use:
 ```
-$ cd sre-challenge/invoice-app/
-$ kubectl apply -f ingress.yaml
+$ minikube tunnel
 ```
 
-In minikube it is easy to get the url:
+To create the loadbalancer from code use:
 ```
-$ minikube service invoice-app-backend --url
+$ cd sre-challenge/invoice-app
+$ kubectl apply -f loadbalancer.yaml
 ```
 
-You have to end it with: **/invoices**
-
-Under not minikube / from kubectl command lines it is a combination of the ingress' IP (this is the externally available Ngnix service). You can get it from:
+You can verify that it created properly use
 ```
-$ kubectl get ingress
-```
-Here you can choose the address.
+$ kubectl get services
 
-To get the IP run: 
 ```
-$ kubectl get service invoice-app-backend
+
+The external url will be: **http:/<EXTERNAL_IP>:8081**
+To check it works you should check the GET endpoint: **http:/<EXTERNAL_IP>/invoices**
+
+I have deployed the 2 applications on Minikube. On Minikube you have to start exposing the internal ips with minikube tunnel:
 ```
-The port is the second port number.
+$ minikube tunnel
+```
 
-The url will be: **http://<INGRESS_ADDRESS>:<SERVICE_TARGET_IP>/invoices**
+To install the loadbalancer from code use:
+```
+$ cd sre-challenge/invoice-app
+$ kubectl apply -f loadbalancer.yaml
+```
 
+To get the IP address:
+```
+$ kubectl get services
+```
+
+The external url will be: **http:/<EXTERNAL_IP>:8081**
+To check it works you should check the GET endpoint: ***http:/<EXTERNAL_IP>:8081/invoices***
 2. `payment-provider` must be only reachable from inside the cluster.
+**Note:** You can troubleshoot the application by [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) to your local host. 
+
 3. Update existing `deployment.yaml` files to follow k8s best practices. Feel free to remove existing files, recreate them, and/or introduce different technologies. Follow best practices for any other resources you decide to create.
 4. Provide a better way to pass the URL in `invoice-app/main.go` - it's hardcoded at the moment
 5. Complete `deploy.sh` in order to automate all the steps needed to have both apps running in a K8s cluster.
