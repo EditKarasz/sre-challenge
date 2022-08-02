@@ -112,54 +112,45 @@ I have used a loadballancer. I have deployed the 2 applications on Minikube. On 
 $ minikube tunnel
 ```
 
-To create the loadbalancer from code use:
-```
-$ cd sre-challenge/invoice-app
-$ kubectl apply -f loadbalancer.yaml
-```
+**Note:** I have changed the kubernetes service configuration files to templates. These are not valid service configurations anymore. To create the loadbalancer use the deploy.sh script.
 
-You can verify that it created properly use
+You can verify that it is created properly use:
 ```
-$ kubectl get services
+$ kubectl get services --namespace payment-services
 
 ```
 
 The external url will be: **http:/<EXTERNAL_IP>:8081**
 To check it works you should check the GET endpoint: **http:/<EXTERNAL_IP>/invoices**
 
-I have deployed the 2 applications on Minikube. On Minikube you have to start exposing the internal ips with minikube tunnel:
-```
-$ minikube tunnel
-```
-
-To install the loadbalancer from code use:
-```
-$ cd sre-challenge/invoice-app
-$ kubectl apply -f loadbalancer.yaml
-```
-
-To get the IP address:
-```
-$ kubectl get services
-```
-
 The external url will be: **http:/<EXTERNAL_IP>:8081**
 To check it works you should check the GET endpoint: ***http:/<EXTERNAL_IP>:8081/invoices***
 2. `payment-provider` must be only reachable from inside the cluster.
 **Note:** You can troubleshoot the application by [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) to your local host. 
-
 3. Update existing `deployment.yaml` files to follow k8s best practices. Feel free to remove existing files, recreate them, and/or introduce different technologies. Follow best practices for any other resources you decide to create.
-
-- This step is outside of the deployment.yaml but I wanted to add it here. I have not merged the two deployment files into one because of multiple reasons. I have added to each of them a separate namespace. It is in a separate file. (It is in a higher cluster level). I will use it for the deployment.sh script's first version.  I have created 2 namespaces for the 2 applications because these are independent services. It is easier to set up RBAC roles later on namespace level. It is easier to manage these services' lifecycle individually.
-- I have added labels. It will be good for grouping if we expand the services in the future.
+- I have added labels. It will be good for grouping if we expand the services in the future. I use the labels for the kubectl queries.
 - I have created a service for each application for management reasons. invoice-app's service is a loadbalancer. This means a network layout is assinged to it. The payment-provider has a simple service for magement reason.
 - I have added resources to the containers / pods. In this excercise it is not important but when we plan how much resources we need to size the cluster which host multiple applications and/or environments it is useful. Resource requests and limits determines if an application can be deployed on the cluster and which node has enough resources available to host a new pod. The LimitRange works on namespace level but if we have gotten a complex service with multiple applications, and these applications have different resource needs I would specify directly the resources in the deployment. See commented lines in the deployment.yaml
 - This is not important but I have updated the rollout strategy. It is not important because we do not talk about releases in this exercise. It is a ramped (slow) rollout. The new release creates a new replica set. One new pod spins up at the time and one stops from the original replica set. Replaces one at the time.
 - This is not important because if we use kubectl for deployment it can run all the files located in a folder but I have moved every yaml file in one configuration as code file.
-
+**Note**: It is suggested to have one kubernetes service configuration file / service. I haven't done that because in the deploy.sh script I use yq to update the environment variables. qy creates the key does not exist in the attribute hierarcy. In our example it created container attribute in the service.
 4. Provide a better way to pass the URL in `invoice-app/main.go` - it's hardcoded at the moment
+I have created an environment variable PAYMENT_URL. I get it from the Docker container. It is possibe to update the url at build time. The best would have been if I can update the variable in run time. I don't have a clear view how to do this. Maybe a configmap is the right place to pass this parameter to the containers at the time these spined up.
+**Note:** This was the task when I realised that the 2 applications are connected. I have moved them into the same namespace.
+
 5. Complete `deploy.sh` in order to automate all the steps needed to have both apps running in a K8s cluster.
+
+**Note:** I use jq for querying service attributes. You have to install it on your deployment enviroment.
+
+I have created a similar deployment as a demo we have done at Etraveli. It is using the service configurations as code with kubectl. We update the yaml templates according the environment we want to build with variable replacement. As a next step it is possible to create custom Helm charts for each service. I would (if I have time I will) rewrite the whole deployment to use [Kustomize](https://kustomize.io/). Currently I use Kustomize because you can keep your configuration as code small by only listing the attributes / settings which are necessary to describe the services.
+
+I created kubernetes service configuration templates out from the existing yaml files. The deployment file customise it / service. I have added comments inline the code.
+**Note**: yq is a prerequirement for the deploy.sh script.
+
 6. Complete `test.sh` so we can validate your solution can successfully pay all the unpaid invoices and return a list of all the paid invoices.
+
+**Note:** I have tested the deployment steps and that the services are up to date in deployment time. As an extra step I would set up service monitoring. I have experie'ce with the Prometheus, Loki, Grafana observibility tools on Kubernetes.
+
 
 ### Part 3 - Questions
 
@@ -171,15 +162,19 @@ This is added inline in the README.md for each commit. As I progress I add my co
 
 1. What would you do to improve this setup and make it "production ready"?
 
-I would add a build step and a deploy step so I would cut the Docker container into half. This would be easier if I have a solution that can be shared with github project.
+- Regarding the Docker containers: I would add a build step and a deploy step so I would cut the Docker container into half. This would be easier if I have a solution that can be shared with github project.
+- I would create multiple environments. At least stage and prod. These environments can be on the same cluster within different projects with the same namespaces. We can create multiple namespaces for each enviroment, we can have multiple clusters for each environments... etc. There are many designs available.
+- I would add a build and a deploy pipeline. The build pipeline would have code quality checks, syntax checks. If there is a codebase the unittest would be added here. The deploy pipeline would deploy to multiple environments. On each environment it would run an integartion test on the top. Each environmnet would be dependent on the other's success. For example: stage build would only start if dev deployment succeeds. Dev deployment would be dependent on a successfull dev build.
 
 2. There are 2 microservices that are maintained by 2 different teams. Each team should have access only to their service inside the cluster. How would you approach this?
 
-I would use RBAC aaccess control model. It can be implemented with a Role on a namespace level. On Google Cloud Platform Google users and groups are integrated to the Kubernetes system. I worked on a solution which used Active Directory / LDAP for authentication and authorisation. 
+I would use RBAC aaccess control model.  On Google Cloud Platform Google users and groups are integrated to the Kubernetes system. I worked on a solution which used Active Directory / LDAP for authentication and authorisation. 
+
+**Note:** Because the two services are dependent on each other I cannot give a better solution for this ATM. The payment-provider is only reachable inside the the cluster. I have moved the 2 apps into the same namespace. The suggestion to separate the teams with a Role which is namespace specific does work anymore. We can set up RoleBindigs for the teams...
 
 3. How would you prevent other services running in the cluster to communicate to `payment-provider`?
 
-The build in option is to set up Network Policies. You can set up that there is no inbound traffic reaches the namespace. You can enable and block communication between pods. I think Ngnix also offers ingress options for network isolation but I don't know much about this.
+The built in Kubernetes option is to set up Network Policies. You can set up that there is no inbound traffic reaches the namespace. You can enable and block communication between pods. I think Ngnix also offers ingress options for network isolation but I don't know much about this.
 
 ## What matters to us?
 

@@ -1,22 +1,10 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: payment-provider
-  labels:
-    app: payment-provider-app
-    tier: frontend
-spec:
-  ports:
-  - port: 8082
-  selector:
-    app: payment-provider-app
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-provider
   labels:
-    app: payment-provider-app
+    app: payment-provider
+    instance: $INSTANCE
     tier: frontend
 spec:
   replicas: 3
@@ -27,16 +15,16 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: payment-provider-app
+      app: payment-provider
+      instance: $INSTANCE
   template:
     metadata:
       labels:
-        app: payment-provider-app
+        app: payment-provider
+        instance: $INSTANCE
         tier: frontend
     spec:
       containers:
       - name: main
-        image: karasze/payment-provider:latest
+        image: karasze/payment-provider:$VERSION
         imagePullPolicy: IfNotPresent
-      securityContext:
-        runAsNonRoot: false
