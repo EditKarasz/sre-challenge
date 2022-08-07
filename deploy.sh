@@ -116,7 +116,8 @@ do
   ### Extra check for invoice-app because it should be available externally
   if [[ "${application}" == "invoice-app" ]]
   then
-    ## Wait a minute for provisioning 
+    ## Wait a minute for provisioning
+    echo '1 minute break.' 
     sleep 60
     ## Collect EXTERNAL-IP:
     external_ip=$(kubectl get services --namespace="${application}" --selector app="${application}" -o yaml | yq  .items[0].status.loadBalancer.ingress.[0].ip)

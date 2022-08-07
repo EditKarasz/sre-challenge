@@ -98,7 +98,7 @@ $ kubectl describe pods <POD_NAME>
 
 We can also check the output logs of the container:
 ```
-$ kubectl logs pods <POD_NAME>
+$ kubectl logs <POD_NAME>
 ```
 
 ### Part 2 - Setup the apps
@@ -146,6 +146,18 @@ I have created a similar deployment as a demo we have done at Etraveli. It uses 
 
 I have tested the deployment steps and that the services are up to date in deployment time.
 6. Complete `test.sh` so we can validate your solution can successfully pay all the unpaid invoices and return a list of all the paid invoices.
+I could not implement this however I don't like this solution. The testing itself is **invoice-app/test/test.py**. test.sh executes in externally, on your localhost with kubectl command lines. These are my considerations:
+- I used Python3 because of the **requests** module. I can call Python from an shell script.
+- The payment app is only internally available. I have not find a good solution to run it at the right place. I run it inside the invoice-app namespace. I can run scripts with a command line if it is available internally on the container image. To do this I store the script on the image and I installed python3 on it in build time. Than I can execute the script from one of the pods: **kubectl exec --stdin --tty invoice-app-5cdd4bd6d9-8zqq5 --namespace invoice-app -- test/python3**. I would only use this on a non-prod environment.
+- The applications are not documented. I reverse engineered it but in real life I would not do this but ask the developers to provide information. The payment url is from the invoice-app's namespace is **http://payment-provider.payment-provider.svc.cluster.local:8082/payment/pay** The data is 1 invoice form the . For example: **http:/<EXTERNAL_IP>/invoices** list (- the InPaid attribute)
+```
+{
+InvoiceId: XXX, 
+Value: YYY,
+Currency: ZZZ
+}
+```
+- I would not write a fuctionality test which changes the status of the deployed service data. I would ask the developers to provide unit tests attached to the code. They could create a mock test for their service so they don't need to deploy it. I would write an integration test to check the functionalities but create and remove my uploaded data.
 
 ### Part 3 - Questions
 
@@ -163,6 +175,7 @@ This is added inline in the README.md for each commit. As I progress I add my co
 - I would rearrange the kubernetes service templates to a Kustomize project. I would generate the custom kubernetes service templates from kustomize.
 - As an extra step I would set up service monitoring. I have experie'ce with the Prometheus, Loki, Grafana observibility tools on Kubernetes.
 - If we run it on a commercially available cloud service I would set up cost monitoring too.
+- I would use disks to store the database data on it. I would set up regular backups.
 
 2. There are 2 microservices that are maintained by 2 different teams. Each team should have access only to their service inside the cluster. How would you approach this?
 
