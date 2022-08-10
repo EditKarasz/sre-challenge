@@ -3,12 +3,10 @@ kind: Service
 metadata:
   name: invoice-app-loadbalander
   labels:
-    app: invoice-app
-    instance: $INSTANCE
     tier: frontend
 spec:
   selector:
-    app: invoice-app
+    app: $APP
     instance: $INSTANCE
   ports:
     - port: 8081
@@ -20,8 +18,6 @@ kind: Service
 metadata:
   name: payment-app-endpoint
   labels:
-    app: invoice-app
-    instance: $INSTANCE
     tier: frontend
 spec:
   externalName: payment-provider.payment-provider.svc.cluster.local

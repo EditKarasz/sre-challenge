@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namePrefix: dev-
+commonLabels:
+  environment: dev
+resources:
+- invoice-app
+- payment-provider

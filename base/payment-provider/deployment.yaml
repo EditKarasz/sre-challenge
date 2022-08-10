@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: payment-provider
   labels:
-    app: payment-provider
-    instance: $INSTANCE
     tier: frontend
 spec:
   replicas: 3
@@ -15,16 +13,14 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: payment-provider
+      app: $APP
       instance: $INSTANCE
   template:
     metadata:
       labels:
-        app: payment-provider
-        instance: $INSTANCE
         tier: frontend
     spec:
       containers:
       - name: main
-        image: karasze/payment-provider:$VERSION
+        image: karasze/payment-provider:latest
         imagePullPolicy: IfNotPresent

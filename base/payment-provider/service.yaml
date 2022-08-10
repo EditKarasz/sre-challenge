@@ -3,12 +3,10 @@ kind: Service
 metadata:
   name: payment-provider
   labels:
-    app: payment-provider
-    instance: $INSTANCE
     tier: frontend
 spec:
   ports:
   - port: 8082
   selector:
-    app: payment-provider
+    app: $APP
     instance: $INSTANCE

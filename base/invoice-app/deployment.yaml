@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: invoice-app
   labels:
-    app: invoice-app
-    instance: $INSTANCE
     tier: frontend
 spec:
   replicas: 3
@@ -15,18 +13,16 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: invoice-app
+      app: $APP
       instance: $INSTANCE
   template:
     metadata:
       labels:
-        app: invoice-app
-        instance: $INSTANCE
         tier: frontend
     spec:
       containers:
       - name: main
-        image: karasze/invoice-app:$VERSION
+        image: karasze/invoice-app:latest
         ## This is how you can specify the resources / container
         ## We will use LimitRange on the cluster / namespace level
         #resources:
@@ -36,4 +32,5 @@ spec:
         #  limits:
         #    cpu: 150m
         #    memory: 150Mi
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+      restartPolicy: Always

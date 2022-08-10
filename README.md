@@ -50,7 +50,7 @@ payment-provider-abcdef1234-1ab25   1/1     Ready                        0      
 
 The first step is to build an image called invoice-app and payment-provider.
 
-I have used MiniKube on my local computer. It needs to connect to an external container registry.
+I have used MiniKube on my local computer. It needs to connect to an external container registry. To connect to the one your docker user uses:
 ```$ minikube addons configure registry-creds```
 
 I have added my dockerhub account where I have pushed the built images. This meant I had to change the path to the image:
@@ -66,7 +66,7 @@ In the deployment.yaml we specify to run the application on a service user.
 This is not really a bug but washing together the build and deployment steps. It is good to run the application as a non priviliged user. It is also
 good to have a container where we install build tools and modules and the application is  in a separate container just itself.
 
-The best solution would be to separate the steps into 2 by having a build Docker container and a deploy Docker container. If we use a build pipeline
+The best solution would be to separate the steps into 2, by having a build Docker container and a deploy Docker container. If we use a build pipeline:
 1. we can build the application in the first step
 2. if succeeds we can add a test (syntax, semantics, functionality with unittests)
 3. if succeeds we can create a deploy container and deploy it on the given environment
@@ -83,6 +83,10 @@ but this is the default so we can remove it from the configuration.
 
 After this the application is running but it hasn't displayed anything. I checked the pod logs and I find out that the port is not the default 8080. It has been changed to 8081. To test it you can submit a GET request which means to add /invoice at the end of the URI.
 
+**Note:** I have defined the current setting as dev environment.
+* I use the latest docker build not a versioned (released one)
+* I build and deploy in the same step / container image
+
 #### Troubleshooting
 
 Checking the health of the pods:
@@ -97,9 +101,12 @@ $ kubectl describe pods <POD_NAME>
 ```
 
 We can also check the output logs of the container:
+
 ```
 $ kubectl logs <POD_NAME>
 ```
+
+**Note**: this is useful to figure it out how does the applications work?
 
 ### Part 2 - Setup the apps
 
@@ -114,9 +121,7 @@ I have used a loadballancer. I have deployed the 2 applications on Minikube. On 
 $ minikube tunnel
 ```
 
-**Note:** I have changed the default yaml service configuration files into templates. These are not valid service configurations anymore. To create the loadbalancer use the deploy.sh script.
-
-You can verify that it is created properly use:
+You can verify that it is deployed and created properly by kubectl command lines:
 ```
 $ kubectl get services --namespace invoice-app
 
@@ -124,32 +129,34 @@ $ kubectl get services --namespace invoice-app
 
 The external url will be: **http:/<EXTERNAL_IP>:8081**
 To check it works you should check the GET endpoint: **http:/<EXTERNAL_IP>/invoices**
+**Note:** There will be another service which make the payment-provider app endpoint available internally on the invoice-app namespace.
 2. `payment-provider` must be only reachable from inside the cluster.
-**Note:** You can troubleshoot the application by [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) to your local host.
+**Note:** You can troubleshoot the application by [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) to your local host. By default it is only available inside the cluster.
 3. Update existing `deployment.yaml` files to follow k8s best practices. Feel free to remove existing files, recreate them, and/or introduce different technologies. Follow best practices for any other resources you decide to create.
 - I have added labels. It will be good for grouping if we expand the services in the future. I use the labels for the kubectl queries too.
-- I have created a service for each application for management reasons. invoice-app's service is a loadbalancer. This means a network layout is assinged to it. The payment-provider has a simple service for magement reason.
-- I have created separate namespaces for each application.
+- I have created a service for each application for management reasons. invoice-app's service is a loadbalancer. This means a network layout is assinged to it. The payment-provider has a simple service for management reason.
+- I have created separate namespaces for each application. This is for to separate the application and to set up separate RBAC access to them.
 - Since I have learnt that the invoice app uses the payment-provider and the payment-provider does not have an externally exposed endpoint I have created a service which access the service internally, across namespaces.
-- I have added resources to the containers / pods. In this excercise it is not important but when we plan how much resources we need to determine the size of the cluster, how many hosts we need for placement, how we will host multiple applications and/or environments it is useful. Resource requests and limits determines if an application can be deployed on the cluster and which node has enough resources available to host a new pod. The LimitRange works on namespace level but if we have gotten a complex service with multiple applications, and these applications have different resource needs I would specify directly the resources in the deployment.yaml file. See commented lines in the deployment.yaml
+- I have added resources to the containers / pods. In this excercise it is not important but when we plan how much resources we need to determine the size of the cluster, how many hosts we need for placement, how we will host multiple applications and/or environments it is useful. Resource requests and limits determines if an application can be deployed on the cluster and which node has enough resources available to host a new pod. The LimitRange works on namespace level but if we have gotten a complex service with multiple applications, and these applications have different resource needs I would specify directly the resources in the deployment.yaml file. See commented lines in the invoice-app/deployment.yaml
 - This is not important but I have updated the rollout strategy. It is not important because we do not talk about releases in this exercise. It is a ramped (slow) rollout. The new release creates a new replica set. One new pod spins up at the time and one stops from the original replica set. Replaces one at the time.
-**Note**: It is suggested to have one kubernetes service configuration file / service. I haven't done that because in the deploy.sh script I use yq to update the environment variables. qy creates the key does not exist in the attribute hierarcy. In our example it created container attribute in the service.
+- Kustomize will create us 1 configuration file for the whole required service deployment. (That is the suggested best practice.)
 4. Provide a better way to pass the URL in `invoice-app/main.go` - it's hardcoded at the moment
 I have created an environment variable PAYMENT_URL. I get it from the Docker container. It is possibe to update the url at build time. The best would have been if I can update the variable in run time. ATM I don't have a clear view how to do this. Maybe a configmap is the right place to pass this parameter to the containers at the time these spined up.
 **Note:** This was the task when I realised that the 2 applications are connected.
 
 5. Complete `deploy.sh` in order to automate all the steps needed to have both apps running in a K8s cluster.
 
-**Note:** I use yq for querying service attributes. You have to install it on your deployment enviroment.
+I have not used make at all during this excercise. We have to invoke 1 command line to deploy. make can invoke a command line too.
 
-I have created a similar deployment as a demo we have done at Etraveli. It uses template service configuration yaml files with kubectl. We update the yaml templates according the environment that we want to build with variable replacement. As a next step this solution can be replaced by creating custom Helm charts for each service. I would (if I have time I will) rewrite the whole deployment to use [Kustomize](https://kustomize.io/). Currently I use Kustomize because you can keep your configuration as code small by only listing the attributes / settings which are necessary to describe the services.
+I have changed the default deployment strategy to use Kustomize. **kubectl apply -f ./base** should be able to deploy the kustomise project. If you want to generate the yaml configuration files to check that the service configuration is what you want you have to [install Kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/). To see the output run: **kustomize build**
 
-I have tested the deployment steps and that the services are up to date in deployment time.
+**Note:** Kustomize have versions which have bugs. You might have to install a different version from the one on your computer to successfully generate the service configuration files. I run the current latest: kustomize version 4.5.7. 
+
 6. Complete `test.sh` so we can validate your solution can successfully pay all the unpaid invoices and return a list of all the paid invoices.
-I could not implement this however I don't like this solution. The testing itself is **invoice-app/test/test.py**. test.sh executes in externally, on your localhost with kubectl command lines. These are my considerations:
-- I used Python3 because of the **requests** module. I can call Python from an shell script.
+I could not implement this however I don't like the solution which I have created. The testing itself is **invoice-app/test/test.py**. test.sh executes the testing externally, on your localhost with kubectl command lines. These are my considerations:
+- I used Python3 because of the **requests** module.
 - The payment app is only internally available. I have not find a good solution to run it at the right place. I run it inside the invoice-app namespace. I can run scripts with a command line if it is available internally on the container image. To do this I store the script on the image and I installed python3 on it in build time. Than I can execute the script from one of the pods: **kubectl exec --stdin --tty invoice-app-5cdd4bd6d9-8zqq5 --namespace invoice-app -- test/python3**. I would only use this on a non-prod environment.
-- The applications are not documented. I reverse engineered it but in real life I would not do this but ask the developers to provide information. The payment url is from the invoice-app's namespace is **http://payment-provider.payment-provider.svc.cluster.local:8082/payment/pay** The data is 1 invoice form the . For example: **http:/<EXTERNAL_IP>/invoices** list (- the InPaid attribute)
+- The applications are not documented. I reverse engineered it but in real life I would not do this but ask the developers to provide information. The payment url is from the invoice-app's namespace is **http://payment-provider.payment-provider.svc.cluster.local:8082/payment/pay** The data is 1 invoice form **http:/<EXTERNAL_IP>/invoices** list minus the the InPaid attribute. It is:
 ```
 {
 InvoiceId: XXX, 
@@ -157,7 +164,7 @@ Value: YYY,
 Currency: ZZZ
 }
 ```
-- I would not write a fuctionality test which changes the status of the deployed service data. I would ask the developers to provide unit tests attached to the code. They could create a mock test for their service so they don't need to deploy it. I would write an integration test to check the functionalities but create and remove my uploaded data.
+- I would not write a fuctionality test which changes the status of the deployed service data. I would ask the developers to provide unit tests attached to the code. They could create a mock test for their service so they don't need to deploy it. I would write integration test to check the functionalities but not to change any of the default data on the service. I would create and remove my uploaded data.
 
 ### Part 3 - Questions
 
