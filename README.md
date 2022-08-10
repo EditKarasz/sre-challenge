@@ -53,25 +53,25 @@ The first step is to build an image called invoice-app and payment-provider.
 I have used MiniKube on my local computer. It needs to connect to an external container registry. To connect to the one your docker user uses:
 ```$ minikube addons configure registry-creds```
 
-I have added my dockerhub account where I have pushed the built images. This meant I had to change the path to the image:
+I have added my dockerhub account where I have push the images. This meant I had to change the path to the image. For example on the invoice-app:
 ```
 $ grep 'image:' sre-challenge/invoice-app/deployment.yaml
 ...
-        image: karasze/payment-provider:latest
+        image: karasze/invoice-app:latest
 ```
 
 It is not possible to deploy the image from the deployment.yaml The image builds the application and run it as the default root user.
 In the deployment.yaml we specify to run the application on a service user.
 
 This is not really a bug but washing together the build and deployment steps. It is good to run the application as a non priviliged user. It is also
-good to have a container where we install build tools and modules and the application is  in a separate container just itself.
+good to have a container where we install build tools and modules and the application itself is in a separate container.
 
 The best solution would be to separate the steps into 2, by having a build Docker container and a deploy Docker container. If we use a build pipeline:
 1. we can build the application in the first step
-2. if succeeds we can add a test (syntax, semantics, functionality with unittests)
+2. if succeeds we can add a tests (syntax, semantics, functionality with unittests)
 3. if succeeds we can create a deploy container and deploy it on the given environment
 4. We run integration tests
-5. If it was dev or stage we kick off the next level of build / deployment
+5. If it was dev or stage we kick off the next level of builds / deployments...
 
 The fast solution is to allow the docker container to run as root on Kubernetes:
 ```
@@ -86,6 +86,9 @@ After this the application is running but it hasn't displayed anything. I checke
 **Note:** I have defined the current setting as dev environment.
 * I use the latest docker build not a versioned (released one)
 * I build and deploy in the same step / container image
+* I always pull the image and always restart it
+
+These settings would have been removed / changed in a production environmnet.
 
 #### Troubleshooting
 
@@ -95,18 +98,16 @@ $ kubectl get pods
 ```
 
 Unhealthy. Selecting one of the pods and check the status (at the end the latest logs):
-
 ```
 $ kubectl describe pods <POD_NAME>
 ```
 
-We can also check the output logs of the container:
-
+We can also check the output logs on the given container:
 ```
 $ kubectl logs <POD_NAME>
 ```
 
-**Note**: this is useful to figure it out how does the applications work?
+**Note**: this is useful to understand how is the application set up?
 
 ### Part 2 - Setup the apps
 
@@ -116,7 +117,7 @@ We would like these 2 apps, `invoice-app` and `payment-provider`, to run in a K8
 
 1. `invoice-app` must be reachable from outside the cluster.
 
-I have used a loadballancer. I have deployed the 2 applications on Minikube. On Minikube to expose the service on a external IP address you have to use minikube tunnel. To create it use:
+I have used a loadballancer. I have deployed the 2 applications on Minikube. On Minikube to expose the service on an external IP address you have to use minikube tunnel. To create it run:
 ```
 $ minikube tunnel
 ```
@@ -148,14 +149,15 @@ I have created an environment variable PAYMENT_URL. I get it from the Docker con
 
 I have not used make at all during this excercise. We have to invoke 1 command line to deploy. make can invoke a command line too.
 
-I have changed the default deployment strategy to use Kustomize. **kubectl apply -f ./base** should be able to deploy the kustomise project. If you want to generate the yaml configuration files to check that the service configuration is what you want you have to [install Kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/). To see the output run: **kustomize build**
+I have changed the default deployment strategy to use Kustomize. It does not need a deploy.sh. **kubectl apply -f ./base** should be able to deploy the kustomise project. If you want to generate the yaml configuration files for verification than [install Kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/). To see the output run: **kustomize build**. You can use the 2 command lines together like: **kustomize build ./base | kubectl apply -f -**
 
-**Note:** Kustomize have versions which have bugs. You might have to install a different version from the one on your computer to successfully generate the service configuration files. I run the current latest: kustomize version 4.5.7. 
+**Note:** Some of the Kustomize versions have been released with bugs. You might have to install a different version from the one on your computer to successfully generate the service configuration files. I was able to generate a proper output with Kustomize version 4.5.7. 
 
 6. Complete `test.sh` so we can validate your solution can successfully pay all the unpaid invoices and return a list of all the paid invoices.
 I could not implement this however I don't like the solution which I have created. The testing itself is **invoice-app/test/test.py**. test.sh executes the testing externally, on your localhost with kubectl command lines. These are my considerations:
+- **Prerequirements**: You need to install **yq** on the host where you run the test.sh from. I use it in one of the kubectl queries.
 - I used Python3 because of the **requests** module.
-- The payment app is only internally available. I have not find a good solution to run it at the right place. I run it inside the invoice-app namespace. I can run scripts with a command line if it is available internally on the container image. To do this I store the script on the image and I installed python3 on it in build time. Than I can execute the script from one of the pods: **kubectl exec --stdin --tty invoice-app-5cdd4bd6d9-8zqq5 --namespace invoice-app -- test/python3**. I would only use this on a non-prod environment.
+- The payment app is only internally available. I have not find a good solution to run it at the right place. I run it inside the invoice-app namespace. I can run scripts with a command line if it is available internally on the container image. So I store the script on the image and I installed python3 on it in build time. Than I can execute the script from one of the pods: **kubectl exec --stdin --tty invoice-app-5cdd4bd6d9-8zqq5 --namespace invoice-app -- test/python3**. I would only use this on a non-prod environment.
 - The applications are not documented. I reverse engineered it but in real life I would not do this but ask the developers to provide information. The payment url is from the invoice-app's namespace is **http://payment-provider.payment-provider.svc.cluster.local:8082/payment/pay** The data is 1 invoice form **http:/<EXTERNAL_IP>/invoices** list minus the the InPaid attribute. It is:
 ```
 {
@@ -186,11 +188,11 @@ This is added inline in the README.md for each commit. As I progress I add my co
 
 2. There are 2 microservices that are maintained by 2 different teams. Each team should have access only to their service inside the cluster. How would you approach this?
 
-I would use RBAC aaccess control model.  On Google Cloud Platform Google users and groups are integrated to the Kubernetes system. I worked on a solution which used Active Directory / LDAP for authentication and authorisation. 
+I would use RBAC access control model. On Google Cloud Platform Google users and groups are integrated to the Kubernetes system. I worked on a solution which used Active Directory / LDAP for authentication and authorisation. 
 
 3. How would you prevent other services running in the cluster to communicate to `payment-provider`?
 
-The built in Kubernetes option is to set up Network Policies. You can set up that there is no inbound traffic reaches the namespace. You can enable and block communication between pods. I think Ngnix also offers ingress options for network isolation but I don't know much about this.
+The built in Kubernetes option is to set up Network Policies. You can set up that there is no inbound traffic reaches the namespace. You can enable and block communication between pods. I think Ngnix also offers ingress options for network isolation but I don't know much about this. You probably use Istio to set up and manage and monitor this.
 
 ## What matters to us?
 
